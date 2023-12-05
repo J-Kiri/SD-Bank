@@ -3,7 +3,8 @@ package src;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.SQLiteConnectionFactory;
+import java.sql.DriverManager;
+import java.sql.Statement;
 
 public class Account{
     private String Name;
@@ -11,9 +12,7 @@ public class Account{
     private String CPF;
     private int Key;
 
-    private static final String INSERT_SQL = "INSERT INTO Account(Nome, CPF, Saldo, Key) VALUES(?, ?, ?, ?)";
-
-    connection = SQLiteConnectionFactory.getConnection();
+    //private static final String INSERT_SQL = "INSERT INTO Account(Nome, CPF, Saldo, Key) VALUES(?, ?, ?, ?)";
 
     public void setName(String Name){
         this.Name = Name;
@@ -31,28 +30,32 @@ public class Account{
         this.Key = Key;
     }
 
-    public void connectionDB(Connection connection) {
-        this.connection = connection;
+    public Connection connect() {
+        // SQLite connection string
+        Class.forName("org.sqlite.JDBC");
+        String url = "D://IFMG//SD//Trabalho_Banco//SD-Bank//base.sqlite";
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(url);
+        } catch (SQLException e) {
+            System.out.println("Error connecting to the database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return conn;
     }
 
-    public int pushDB(String Name, String Password, String CPF, int Key){
-        int rowsInserted = 0;
-        PreparedStatement ps = null;
+    public void pushDB(String Name, String Password, String CPF, int Key){
+        String sql = "INSERT INTO Account(Nome, CPF, Saldo, Key) VALUES(?, ?, ?, ?)";
 
-        try {
-            ps = this.connection.prepareStatement(INSERT_SQL);
-            ps.setString(1, Name);
-            ps.setString(2, Password);
-            ps.setString(3, CPF);
-            ps.setInt(4, Key);
-            rowsInserted = ps.executeUpdate();
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            close(ps);
-        }
-        return rowsInserted;
+        try(Connection conn = this.connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)){
+                pstmt.setString(1, Name);
+                pstmt.setString(2, Password);
+                pstmt.setString(3, CPF);
+                pstmt.setInt(4, Key);
+        }catch(SQLException e){
+            System.out.println(e.getMessage());
+        } 
     }
 
     public static void close(Statement statement) {
