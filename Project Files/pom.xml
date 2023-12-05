@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>Trabalho SD</groupId>
-    <artifactId>seu-artefato</artifactId>
+    <artifactId>SD Bank</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <dependencies>
