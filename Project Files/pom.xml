@@ -11,9 +11,9 @@
     <dependencies>
         <!-- https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc -->
         <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>3.42.0.0</version>
+            <groupId>dev.tuxjsql</groupId>
+            <artifactId>sqlite</artifactId>
+            <version>2.1</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.jgroups/jgroups -->

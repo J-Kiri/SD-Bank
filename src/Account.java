@@ -32,7 +32,11 @@ public class Account{
 
     public Connection connect() {
         // SQLite connection string
-        Class.forName("org.sqlite.JDBC");
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
         String url = "D://IFMG//SD//Trabalho_Banco//SD-Bank//base.sqlite";
         Connection conn = null;
         try {
