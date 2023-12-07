@@ -10,6 +10,7 @@ public class Account{
     private String Name;
     private String Password;
     private String CPF;
+    private double Balance; 
     private int Key;
 
     //private static final String INSERT_SQL = "INSERT INTO Account(Nome, CPF, Saldo, Key) VALUES(?, ?, ?, ?)";
@@ -24,6 +25,10 @@ public class Account{
 
     public void setCPF(String CPF){
         this.CPF = CPF;
+    }
+
+    public void setBalance(double Balance){
+        this.Balance = Balance;
     }
 
     public void setID(int Key){
@@ -51,15 +56,22 @@ public class Account{
         return conn;
     }
 
-    public void pushDB(String Name, String Password, String CPF, int Key){
-        String sql = "INSERT INTO Account(Nome, CPF, Saldo, Key) VALUES(?, ?, ?, ?)";
+    public void pushDB(Account account){
+        String Name = account.Name;
+        String Password = account.Password;
+        String CPF = account.CPF;
+        double Balance = account.Balance;
+        int Key = account.Key;
+
+        String sql = "INSERT INTO Account(Name, Password, CPF, Balance, Key) VALUES(?, ?, ?, ?, ?)";
 
         try(Connection conn = this.connect();
             PreparedStatement pstmt = conn.prepareStatement(sql)){
                 pstmt.setString(1, Name);
                 pstmt.setString(2, Password);
                 pstmt.setString(3, CPF);
-                pstmt.setInt(4, Key);
+                pstmt.setDouble(4, Balance);
+                pstmt.setInt(5, Key);
 
                 pstmt.executeUpdate();
 
