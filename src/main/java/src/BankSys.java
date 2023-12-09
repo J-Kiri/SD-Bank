@@ -1,4 +1,4 @@
-package src.main.java.src;
+package src;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -20,7 +20,7 @@ public class BankSys{
             String name;
             String password;
             String cpf;
-            double balance;
+            Double balance;
             int id;
 
             boolean result;
@@ -28,7 +28,7 @@ public class BankSys{
 
             
             int account_key = 0;
-            double account_balance = 0;
+            Double account_balance = 0.0;
             String account_name = "";
             String account_cpf = "";
 
@@ -37,7 +37,7 @@ public class BankSys{
             Connection conn = account.connect();
 
             String sql;
-            PreparedStatement ps;
+            PreparedStatement ps, ps2;
 
             while(login == false){
                 System.out.println("    -   SD Bank   -   ");
@@ -123,7 +123,7 @@ public class BankSys{
                         account.setCPF(cpf);
                         System.out.println(" ");
                         
-                        // double balance = keyboard.nextDouble();
+                        // Double balance = keyboard.nextDouble();
                         balance = 1000.00;
                         account.setBalance(balance);      
                         
@@ -156,7 +156,6 @@ public class BankSys{
             if(login == true){
                 account_key = account.getID();
                 account_name = account.getName();
-                sql = "SELECT Name FROM Account WHERE Key = ?";
 
                 System.out.println(" ");
                 System.out.println(" ");
@@ -178,11 +177,94 @@ public class BankSys{
 
                 switch(option){
                     case 1:
-                        account_balance = account.getBalance();
+                        Double montante;
 
+                        sql = "SELECT SUM(Balance) as TotalMontante FROM Account";
+
+                        ps = conn.prepareStatement(sql);
+                        try(ResultSet rs = ps.executeQuery()){
+                            if (rs.next()) {
+                                // Obtém o valor da coluna "TotalBalance"
+                                montante = rs.getDouble("TotalMontante");
+                                System.out.println("Total dos saldos: R$" + montante);
+                            }
+                        }    
                         
                         break;
                     case 2:
+                        int transfer_account = 0;
+                        int own_account = account.getID();
+
+                        Double transfer_value = 0.0, transfer_balance = 0.0;
+                        Double own_balance;
+
+                        String sql1;
+                        String sql2;
+
+                        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
+                            System.out.println("Digite a conta para que voce quer transferir: ");
+                            transfer_account = Integer.parseInt(keyboard.nextLine());
+                        }catch(NumberFormatException e) {
+                            e.printStackTrace();
+                        }
+
+                        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
+                            System.out.println("Digite o valor da transferência: R$");
+                            transfer_value = Double.parseDouble(keyboard.nextLine());
+                        }catch(NumberFormatException e) {
+                            e.printStackTrace();
+                        }
+
+                        sql1 = "SELECT Balance FROM Account WHERE Key = ?";
+                        ps = conn.prepareStatement(sql1);
+                        ps.setInt(1, own_account);
+                        ResultSet rs1 = ps.executeQuery();
+
+                        if(rs1.next()){
+                            own_balance = rs1.getDouble("Balance");
+                            own_balance -= transfer_value;
+                        }else{
+                            System.out.println("Erro ao recuperar saldo da própria conta.");
+                            break;
+                        }
+
+                        sql2 = "SELECT Balance FROM Account WHERE Key = ?";
+
+                        ps2 = conn.prepareStatement(sql2);
+                        ps2.setInt(1, transfer_account);
+
+                        ResultSet rs2 = ps2.executeQuery();
+
+                        if(rs2.next()){
+                            transfer_balance = rs2.getDouble("Balance");
+                            transfer_balance += transfer_value;
+                        }else{
+                            System.out.println("Erro ao recuperar saldo da conta de destino.");
+                            break;
+                        }
+
+                        sql1 = "UPDATE Account SET Balance = ? WHERE Key = ?";
+
+                        ps = conn.prepareStatement(sql1);
+                        ps.setDouble(1, own_balance);
+                        ps.setInt(2, own_account);
+
+                        int rowsAffected1 = ps.executeUpdate();
+
+                        sql2 = "UPDATE Account SET Balance = ? WHERE Key = ?";
+
+                        ps2 = conn.prepareStatement(sql2);
+                        ps2.setDouble(1, transfer_balance);
+                        ps2.setInt(2, transfer_account);
+
+                        int rowsAffected2 = ps2.executeUpdate();
+
+                        if (rowsAffected1 > 0 && rowsAffected2 > 0) {
+                            System.out.println("Transferência concluída com sucesso. Saldos atualizados.");
+                        } else {
+                            System.out.println("Erro ao realizar a transferência.");
+                        }
+
                         break;
                     case 3:
                         System.exit(1);

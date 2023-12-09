@@ -17,7 +17,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>src.main.java.src.BankSys</mainClass>
+                            <mainClass>src.BankSys</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

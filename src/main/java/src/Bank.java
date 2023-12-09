@@ -1,2 +1,2 @@
-package src.main.java.src;
+package src;
 
