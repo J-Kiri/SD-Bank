@@ -19,20 +19,40 @@ public class Account{
         this.Name = Name;
     }
 
+    public String getName(){
+        return Name;
+    }
+
     public void setPassword(String Password){
         this.Password = Password;
+    }
+
+    public String getPassword(){
+        return Password;
     }
 
     public void setCPF(String CPF){
         this.CPF = CPF;
     }
 
+    public String getCPF(){
+        return CPF;
+    }
+
     public void setBalance(double Balance){
         this.Balance = Balance;
     }
 
+    public double getBalance(){
+        return Balance;
+    }
+
     public void setID(int Key){
         this.Key = Key;
+    }
+
+    public int getID(){
+        return Key;
     }
 
     public Connection connect() {
