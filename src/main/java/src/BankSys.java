@@ -7,6 +7,9 @@ import java.sql.SQLException;
 import java.util.Scanner;
 import java.util.Random;
 
+import org.jgroups.JChannel;
+import org.jgroups.Message;
+import org.jgroups.ReceiverAdapter;
 
 public class BankSys{
     public void search(){
