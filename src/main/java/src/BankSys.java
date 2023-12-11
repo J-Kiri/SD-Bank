@@ -7,10 +7,13 @@ import java.sql.SQLException;
 
 import java.util.Scanner;
 import java.util.Random;
+import org.jgroups.*;
+import java.util.*;
 
 import org.jgroups.JChannel;
 import org.jgroups.Message;
-import org.jgroups.blocks.cs.ReceiverAdapter;
+import org.jgroups.Receiver;
+//import org.jgroups.blocks.cs.ReceiverAdapter;
 
 public class BankSys extends ReceiverAdapter{
     static int key = 0;
@@ -42,7 +45,7 @@ public class BankSys extends ReceiverAdapter{
     static Scanner keyboard = new Scanner(System.in);
 
     public BankSys() throws Exception{
-        channel = new JChannel();
+        channel = new JChannel("C:/Users/User/Downloads/SD-Bank/ProjectFiles/cast.xml");
         channel.setReceiver(this);
         channel.connect("BankCluster");
     }
@@ -52,7 +55,7 @@ public class BankSys extends ReceiverAdapter{
         channel.send(msg);
     }
 
-    private void receive(Message msg){
+    public void receive(Message msg){
         String receivedMessage = (String) msg.getObject();
         System.out.println("Received Message: " + receivedMessage);
         
