@@ -22,7 +22,7 @@ public class BankSys extends ReceiverAdapter{
     static Double balance;
     static int id;
 
-    static boolean login = false;
+    private boolean login = false;
 
     
     static int account_key = 0;
@@ -170,7 +170,7 @@ public class BankSys extends ReceiverAdapter{
         Connection conn = account.connect();
         
         try (Scanner keyboard = new Scanner(System.in)) {
-            while(login == false){
+            while(bankSystem.login == false){
                 System.out.println("    -   SD Bank   -   ");
                 System.out.println(" ");
                 System.out.println("[ 1 - Fazer login     ]");
@@ -236,7 +236,7 @@ public class BankSys extends ReceiverAdapter{
             }
 
             
-            if(login == true){
+            if(bankSystem.login == true){
                 account_key = account.getID();
                 account_name = account.getName();
 
