@@ -7,13 +7,10 @@ import java.sql.SQLException;
 
 import java.util.Scanner;
 import java.util.Random;
+
+//import org.jgroups.blocks.cs.ReceiverAdapter;
 import org.jgroups.*;
 import java.util.*;
-
-import org.jgroups.JChannel;
-import org.jgroups.Message;
-import org.jgroups.Receiver;
-//import org.jgroups.blocks.cs.ReceiverAdapter;
 
 public class BankSys extends ReceiverAdapter{
     static int key = 0;
@@ -35,7 +32,6 @@ public class BankSys extends ReceiverAdapter{
 
     // Random r = new Random();
     static Account account = new Account();
-    static Connection conn = account.connect();
 
     static String sql;
     static PreparedStatement ps, ps2;
@@ -45,34 +41,109 @@ public class BankSys extends ReceiverAdapter{
     static Scanner keyboard = new Scanner(System.in);
 
     public BankSys() throws Exception{
-        channel = new JChannel("C:/Users/User/Downloads/SD-Bank/ProjectFiles/cast.xml");
+        channel = new JChannel();
         channel.setReceiver(this);
         channel.connect("BankCluster");
     }
 
-    private void sendMessage(String message) throws Exception{
-        Message msg = new Message(null, null, message);
-        channel.send(msg);
-    }
-
-    public void receive(Message msg){
-        String receivedMessage = (String) msg.getObject();
-        System.out.println("Received Message: " + receivedMessage);
-        
-        if (receivedMessage.equals("LOGIN_SUCCESS")) {
-            System.out.println("Login bem-sucedido!");
-            login = true;
-        } else if (receivedMessage.equals("INVALID_PASSWORD")) {
-            System.out.println("Senha incorreta. Tente novamente.");
-        } else if (receivedMessage.equals("ACCOUNT_NOT_FOUND")) {
-            System.out.println("Conta não encontrada. Tente novamente.");
+    private void sendMessage(String message) {
+        try {
+            Message msg = new Message(null, null, message);
+            channel.send(msg);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private void handlelogin() throws Exception{
+    @Override
+    public void receive(Message msg){
+        try{
+            String receivedMessage = (String) msg.getObject();
+            // System.out.println("Received Message: " + receivedMessage);
+
+            String[] parts = receivedMessage.split(":");
+            String command = parts[0];
+
+            switch(command){
+                case "LOGIN":
+                    handleLogin(parts[1], parts[2]);
+                    break;
+            }
+
+            if (receivedMessage.equals("LOGIN_SUCCESS")) {
+                System.out.println("Login bem-sucedido!");
+                login = true;
+            } else if (receivedMessage.equals("INVALID_PASSWORD")) {
+                System.out.println("Senha incorreta. Tente novamente.");
+            } else if (receivedMessage.equals("ACCOUNT_NOT_FOUND")) {
+                System.out.println("Conta não encontrada. Tente novamente.");
+            }
+        }catch(Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void handleLogin(String key, String password) throws Exception {
+        int account_ID = Integer.parseInt(key);
+        String account_password = password;
+        boolean result;
+
+        Connection conn = account.connect();
+        sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
+    
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, account_password);
+            ps.setInt(2, account_ID);
+            ResultSet rs = ps.executeQuery();
+
+            if (!rs.next()) {
+                sendMessage("INVALID_PASSWORD");
+                return;
+            }
+    
+            result = rs.getBoolean("Password");
+            if (!result) {
+                sendMessage("INVALID_PASSWORD");
+                return;
+            }
+    
+            result = rs.getBoolean("Key");
+            if (!result) {
+                sendMessage("ACCOUNT_NOT_FOUND");
+                return;
+            }
+    
+            // System.out.println("Key: " + account_ID);
+            // System.out.println("Password: " + account_password);
+    
+            sql = "SELECT Name, CPF, Balance FROM Account WHERE Key = ?";
+    
+            try (PreparedStatement ps2 = conn.prepareStatement(sql)) {
+                ps2.setInt(1, account_ID);
+                rs = ps2.executeQuery();
+    
+                if (rs.next()) {
+                    account_name = rs.getString("Name");
+                    account_cpf = rs.getString("CPF");
+                    account_balance = rs.getDouble("Balance");
+    
+                    account.setName(account_name);
+                    account.setPassword(account_password);
+                    account.setCPF(account_cpf);
+                    account.setBalance(account_balance);
+                    account.setID(account_ID);
+    
+                    sendMessage("LOGIN_SUCCESS");
+                }
+            }
+        }
+    }
+    
+
+    private void handleloginRequest() throws Exception, SQLException{
         boolean result;
         
-        do{
+        while(!login){
             try {   //nextInt nao pode ler /n. Ler Line e transformar em int
                 System.out.println("Chave da conta: ");
                 key = Integer.parseInt(keyboard.nextLine());
@@ -84,17 +155,19 @@ public class BankSys extends ReceiverAdapter{
             password = keyboard.nextLine();
             System.out.println(" ");
 
-            String loginRequest = "LOGIN:" + key + "," + password;
+            String loginRequest = "LOGIN:" + key + ":" + password;
             sendMessage(loginRequest);
-        }while(!login);
-        
+        }
     }
 
     private void handleregister() throws Exception{
 
     }
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws Exception {
         boolean result;
+        BankSys bankSystem = new BankSys();
+
+        Connection conn = account.connect();
         
         try (Scanner keyboard = new Scanner(System.in)) {
             while(login == false){
@@ -113,44 +186,7 @@ public class BankSys extends ReceiverAdapter{
 
                 switch(option){
                     case 1:
-                        do{ 
-                            sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
-
-                            ps = conn.prepareStatement(sql);
-                            ps.setString(1, password);
-                            ps.setInt(2, key);
-                            ResultSet rs = ps.executeQuery();
-                            
-                            if((result = rs.getBoolean(1)) == false){
-                                System.out.println("Senha Incorreta");
-                                System.out.println(" ");
-                            }else if((result = rs.getBoolean(2)) == false){
-                                System.out.println("Conta não encontrada");
-                                System.out.println(" ");
-                            }
-                        }while(result == false);
-
-                        System.out.println("Key: " + key);
-                        System.out.println("Password: " + password);
-
-                        sql = "SELECT Name, CPF, Balance FROM Account WHERE Key = ?";
-
-                        ps = conn.prepareStatement(sql);
-                        ps.setInt(1, key);
-                        try(ResultSet rs = ps.executeQuery()){
-                            account_name = rs.getString("Name");
-                            account_cpf = rs.getString("CPF");
-                            account_balance = rs.getDouble("Balance");
-                        }                        
-
-                        account.setName(account_name);
-                        account.setPassword(password);
-                        account.setCPF(account_cpf);
-                        account.setBalance(account_balance); 
-                        account.setID(key);
-
-                        login = true;
-
+                        bankSystem.handleloginRequest();
                         break;
                     case 2:
                         Random r = new Random();
