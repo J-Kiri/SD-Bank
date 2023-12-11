@@ -4,44 +4,96 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+
 import java.util.Scanner;
 import java.util.Random;
 
 import org.jgroups.JChannel;
 import org.jgroups.Message;
-import org.jgroups.ReceiverAdapter;
+import org.jgroups.blocks.cs.ReceiverAdapter;
 
-public class BankSys{
-    public void search(){
+public class BankSys extends ReceiverAdapter{
+    static int key = 0;
+    static int option = 0;
+
+    static String name;
+    static String password;
+    static String cpf;
+    static Double balance;
+    static int id;
+
+    static boolean login = false;
+
+    
+    static int account_key = 0;
+    static Double account_balance = 0.0;
+    static String account_name = "";
+    static String account_cpf = "";
+
+    // Random r = new Random();
+    static Account account = new Account();
+    static Connection conn = account.connect();
+
+    static String sql;
+    static PreparedStatement ps, ps2;
+
+    private JChannel channel;
+    
+    static Scanner keyboard = new Scanner(System.in);
+
+    public BankSys() throws Exception{
+        channel = new JChannel();
+        channel.setReceiver(this);
+        channel.connect("BankCluster");
+    }
+
+    private void sendMessage(String message) throws Exception{
+        Message msg = new Message(null, null, message);
+        channel.send(msg);
+    }
+
+    private void receive(Message msg){
+        String receivedMessage = (String) msg.getObject();
+        System.out.println("Received Message: " + receivedMessage);
+        
+        if (receivedMessage.equals("LOGIN_SUCCESS")) {
+            System.out.println("Login bem-sucedido!");
+            login = true;
+        } else if (receivedMessage.equals("INVALID_PASSWORD")) {
+            System.out.println("Senha incorreta. Tente novamente.");
+        } else if (receivedMessage.equals("ACCOUNT_NOT_FOUND")) {
+            System.out.println("Conta não encontrada. Tente novamente.");
+        }
+    }
+
+    private void handlelogin() throws Exception{
+        boolean result;
+        
+        do{
+            try {   //nextInt nao pode ler /n. Ler Line e transformar em int
+                System.out.println("Chave da conta: ");
+                key = Integer.parseInt(keyboard.nextLine());
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+            }
+            
+            System.out.println("Senha da conta: ");
+            password = keyboard.nextLine();
+            System.out.println(" ");
+
+            String loginRequest = "LOGIN:" + key + "," + password;
+            sendMessage(loginRequest);
+        }while(!login);
+        
+    }
+
+    private void handleregister() throws Exception{
 
     }
     public static void main(String[] args) throws SQLException {
+        boolean result;
+        
         try (Scanner keyboard = new Scanner(System.in)) {
-            int key = 0;
-            int option = 0;
-
-            String name;
-            String password;
-            String cpf;
-            Double balance;
-            int id;
-
-            boolean result;
-            boolean login = false;
-
-            
-            int account_key = 0;
-            Double account_balance = 0.0;
-            String account_name = "";
-            String account_cpf = "";
-
-            // Random r = new Random();
-            Account account = new Account();
-            Connection conn = account.connect();
-
-            String sql;
-            PreparedStatement ps, ps2;
-
             while(login == false){
                 System.out.println("    -   SD Bank   -   ");
                 System.out.println(" ");
@@ -59,17 +111,6 @@ public class BankSys{
                 switch(option){
                     case 1:
                         do{ 
-                            try {   //nextInt nao pode ler /n. Ler Line e transformar em int
-                                System.out.println("Chave da conta: ");
-                                key = Integer.parseInt(keyboard.nextLine());
-                            } catch (NumberFormatException e) {
-                                e.printStackTrace();
-                            }
-                            
-                            System.out.println("Senha da conta: ");
-                            password = keyboard.nextLine();
-                            System.out.println(" ");
-
                             sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
 
                             ps = conn.prepareStatement(sql);
