@@ -4,93 +4,41 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-
 import java.util.Scanner;
 import java.util.Random;
 
+
 public class BankSys{
-    static int key = 0;
-    static int option = 0;
+    public void search(){
 
-    static String name;
-    static String password;
-    static String cpf;
-    static Double balance;
-    static int id;
-
-    static boolean result;
-    static boolean login = false;
-
-    
-    static int account_key = 0;
-    static Double account_balance = 0.0;
-    static String account_name = "";
-    static String account_cpf = "";
-
-    // Random r = new Random();
-    static Account account = new Account();
-    static Connection conn = account.connect();
-
-    static String sql;
-    static PreparedStatement ps, ps2;
-
-    @Override
-    public void login(LoginRequest request, StreamObserver<LoginResponse> responseObserver) {
-    int key = request.getKey();
-    String password = request.getPassword();
-
-    try {
-        String sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
-        ps = conn.prepareStatement(sql);
-        ps.setString(1, password);
-        ps.setInt(2, key);
-        ResultSet rs = ps.executeQuery();
-
-        if (!rs.next()) {
-            // No matching record found
-            responseObserver.onNext(LoginResponse.newBuilder()
-                    .setSuccess(false)
-                    .setMessage("Invalid key or password")
-                    .build());
-        } else {
-            // Matching record found
-            String accountName, accountCPF;
-            double accountBalance;
-
-            sql = "SELECT Name, CPF, Balance FROM Account WHERE Key = ?";
-            ps = conn.prepareStatement(sql);
-            ps.setInt(1, key);
-
-            try (ResultSet resultSet = ps.executeQuery()) {
-                accountName = resultSet.getString("Name");
-                accountCPF = resultSet.getString("CPF");
-                accountBalance = resultSet.getDouble("Balance");
-            }
-
-            // Populate account details and send success response
-            account.setName(accountName);
-            account.setPassword(password);
-            account.setCPF(accountCPF);
-            account.setBalance(accountBalance);
-            account.setID(key);
-
-            responseObserver.onNext(LoginResponse.newBuilder()
-                    .setSuccess(true)
-                    .setMessage("Login successful")
-                    .build());
-        }
-    } catch (SQLException e) {
-        e.printStackTrace();
-        responseObserver.onNext(LoginResponse.newBuilder()
-                .setSuccess(false)
-                .setMessage("Internal server error")
-                .build());
-    } finally {
-        responseObserver.onCompleted();
     }
-}
     public static void main(String[] args) throws SQLException {
         try (Scanner keyboard = new Scanner(System.in)) {
+            int key = 0;
+            int option = 0;
+
+            String name;
+            String password;
+            String cpf;
+            Double balance;
+            int id;
+
+            boolean result;
+            boolean login = false;
+
+            
+            int account_key = 0;
+            Double account_balance = 0.0;
+            String account_name = "";
+            String account_cpf = "";
+
+            // Random r = new Random();
+            Account account = new Account();
+            Connection conn = account.connect();
+
+            String sql;
+            PreparedStatement ps, ps2;
+
             while(login == false){
                 System.out.println("    -   SD Bank   -   ");
                 System.out.println(" ");
@@ -107,6 +55,34 @@ public class BankSys{
 
                 switch(option){
                     case 1:
+                        do{ 
+                            try {   //nextInt nao pode ler /n. Ler Line e transformar em int
+                                System.out.println("Chave da conta: ");
+                                key = Integer.parseInt(keyboard.nextLine());
+                            } catch (NumberFormatException e) {
+                                e.printStackTrace();
+                            }
+                            
+                            System.out.println("Senha da conta: ");
+                            password = keyboard.nextLine();
+                            System.out.println(" ");
+
+                            sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
+
+                            ps = conn.prepareStatement(sql);
+                            ps.setString(1, password);
+                            ps.setInt(2, key);
+                            ResultSet rs = ps.executeQuery();
+                            
+                            if((result = rs.getBoolean(1)) == false){
+                                System.out.println("Senha Incorreta");
+                                System.out.println(" ");
+                            }else if((result = rs.getBoolean(2)) == false){
+                                System.out.println("Conta não encontrada");
+                                System.out.println(" ");
+                            }
+                        }while(result == false);
+
                         System.out.println("Key: " + key);
                         System.out.println("Password: " + password);
 
