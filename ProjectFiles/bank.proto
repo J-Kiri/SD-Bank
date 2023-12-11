@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+option java_package = "src";
+option java_outer_classname = "BankingProto";
+
+service BankingService {
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+    rpc MakeTransfer(MakeTransferRequest) returns (MakeTransferResponse);
+}
+
+message LoginRequest {
+    string name = 1;
+    string password = 2;
+    int32 key = 3;
+}
+
+message LoginResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message RegisterRequest {
+    string name = 1;
+    string password = 2;
+    string cpf = 3;
+}
+
+message RegisterResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetBalanceRequest {
+    int32 key = 1;
+}
+
+message GetBalanceResponse {
+    double balance = 1;
+    string message = 2;
+}
+
+message MakeTransferRequest {
+    int32 fromAccount = 1;
+    int32 toAccount = 2;
+    double amount = 3;
+}
+
+message MakeTransferResponse {
+    bool success = 1;
+    string message = 2;
+}
