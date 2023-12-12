@@ -345,7 +345,7 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             e.printStackTrace();
         }
 
-        String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_account;
+        String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_value;
         sendMessage(registerRequest);
     }
     
