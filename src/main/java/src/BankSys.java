@@ -275,13 +275,17 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
 
             rowsAffected2 = ps2.executeUpdate();
 
-            if(rowsAffected1 > 0 && rowsAffected2 > 0){
-                sendMessage("TRANSFER_SUCCESS");
+            sendMessage("TRANSFER_SUCCESS");
 
-                sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
-            }else{
-                System.out.println("Erro ao realizar a transferência.");
-            }
+            sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
+
+            // if(rowsAffected1 > 0 && rowsAffected2 > 0){
+            //     sendMessage("TRANSFER_SUCCESS");
+
+            //     sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
+            // }else{
+            //     System.out.println("Erro ao realizar a transferência.");
+            // }
 
             Account.close(rs1, conn, ps1);
             Account.close(rs2, null, ps2);
