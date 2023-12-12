@@ -63,7 +63,7 @@ public class Account{
             e.printStackTrace();
         }
 
-        String url = "jdbc:sqlite:base.sqlite";
+        String url = "jdbc:sqlite:BankDB.sqlite";
         Connection conn = null;
 
         try {

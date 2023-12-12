@@ -59,7 +59,6 @@ public class BankSys extends ReceiverAdapter{
     public void receive(Message msg){
         try{
             String receivedMessage = (String) msg.getObject();
-            Connection conn = account.connect();
             // System.out.println("Received Message: " + receivedMessage);
 
             String[] parts = receivedMessage.split(":");
@@ -157,8 +156,12 @@ public class BankSys extends ReceiverAdapter{
                     account.setID(account_ID);
     
                     sendMessage("LOGIN_SUCCESS");
+
+                    Account.close(null, conn, ps2);
                 }
             }
+
+            Account.close(null, conn, ps);
         }
     }
     
@@ -196,6 +199,8 @@ public class BankSys extends ReceiverAdapter{
         account.setID(id);
 
         sendMessage("REGISTER_SUCCESS");
+
+        Account.close(null, conn, ps);
     }
 
     // Transferir quantia X de conta logada para conta selecionada
@@ -262,15 +267,20 @@ public class BankSys extends ReceiverAdapter{
                 ps_update2.setInt(2, transfer_account);
 
                 rowsAffected2 = ps_update2.executeUpdate();
-            }
 
-            if(rowsAffected1 > 0 && rowsAffected2 > 0){
-                sendMessage("TRANSFER_SUCCESS");
+                if(rowsAffected1 > 0 && rowsAffected2 > 0){
+                    sendMessage("TRANSFER_SUCCESS");
 
-                sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
-            }else{
-                System.out.println("Erro ao realizar a transferência.");
-            }
+                    sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
+                }else{
+                    System.out.println("Erro ao realizar a transferência.");
+                }
+
+                Account.close(null, conn1, ps1);
+                Account.close(null, conn2, ps2);
+                Account.close(null, conn_update1, ps_update1);
+                Account.close(null, conn_update2, ps_update2);
+            }            
         }
     }
 
