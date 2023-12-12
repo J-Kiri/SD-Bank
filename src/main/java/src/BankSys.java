@@ -1,5 +1,7 @@
 package src;
 
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -167,7 +169,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                     account.setBalance(account_balance);
                     account.setID(account_ID);
     
-                    channel.send(null, "LOGIN_SUCCESS");
+                    String succMessage = "LOGIN_SUCCESS";
+                    Message msg = new Message(null, succMessage);
+                    channel.send(msg);
                     // sendMessage("LOGIN_SUCCESS");
 
                     Account.close(null, conn, ps2);
@@ -213,7 +217,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         account.setBalance(account_balance); 
         account.setID(id);
 
-        sendMessage("REGISTER_SUCCESS");
+        String succMessage = "REGISTER_SUCCESS";
+        Message msg = new Message(null, succMessage);
+        channel.send(msg);
 
         Account.close(rs, conn, ps);
     }
@@ -280,9 +286,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
 
             rowsAffected2 = ps2.executeUpdate();
             
-            sendMessage("TRANSFER_SUCCESS");
-
-            channel.send(null, "DB_UPDATE:TRANSFER:" + key + ":" + value);
+            String succMessage = "TRANSFER_SUCCESS";
+            Message msg = new Message(null, succMessage);
+            channel.send(msg);
             // sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
 
             //if(rowsAffected1 > 0 && rowsAffected2 > 0){
@@ -313,7 +319,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             System.out.println(" ");
 
             String loginRequest = "LOGIN:" + key + ":" + password;
-            channel.send(null, loginRequest);
+            Message msg = new Message(null, loginRequest);
+            channel.send(msg);
             // sendMessage(loginRequest);
         }
     }
@@ -334,7 +341,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         balance = 1000.00; 
         
         String registerRequest = "REGISTER:" + name + ":" + password + ":" + cpf + ":" + balance;
-        channel.send(null, registerRequest);
+        Message msg = new Message(null, registerRequest);
+        channel.send(null, msg);
         // sendMessage(registerRequest);
     }
 
@@ -357,7 +365,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         }
 
         String transferRequest = "TRANSFER:" + transfer_account + ":" + transfer_value;
-        channel.send(null, transferRequest);
+        Message msg = new Message(null, transferRequest);
+        channel.send(msg);
         // sendMessage(transferRequest);
     }
     
