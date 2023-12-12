@@ -5,18 +5,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import java.util.Scanner;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Random;
-
 //import org.jgroups.blocks.cs.ReceiverAdapter;
-import org.jgroups.JChannel;
-import org.jgroups.Message;
-import org.jgroups.Receiver;
-import org.jgroups.View;
+import org.jgroups.*;
+import java.util.*;
 
-public class BankSys implements Receiver{
-    static int key = 0; 
+public class BankSys extends ReceiverAdapter{
+    static int key = 0;
     static int option = 0;
 
     static String name;
@@ -32,7 +26,8 @@ public class BankSys implements Receiver{
     static String account_name = "";
     static String account_cpf = "";
 
-    // Random r = new Random();
+    private Set<String> processedTransfers = new HashSet<>();
+
     static Account account = new Account();
     private JChannel channel;
     static Scanner keyboard = new Scanner(System.in);
@@ -40,7 +35,7 @@ public class BankSys implements Receiver{
     public BankSys() throws Exception{
         channel = new JChannel();
         channel.setReceiver(this);
-        channel.connect("BankCluster");
+        channel.connect("ProjectFiles/cast.xml");
     }
 
     private void sendMessage(String message) {
@@ -52,27 +47,18 @@ public class BankSys implements Receiver{
         }
     }
 
-    private void processMessage(){
-        while(true){
-            try{
-                Message msg = channel.receive();
-
-                if(msg != null){
-                    String receivedMessage = (String) msg.getObject();
-                    receive(receivedMessage);
-                }
-
-                Thread.sleep(1000);
-            }catch(Exception e){
-                e.printStackTrace();
-            }
-        }
+    private boolean transferAlreadyProcessed(String transferId) {
+        return processedTransfers.contains(transferId);
+    }
+    
+    private void markTransferAsProcessed(String transferId) {
+        processedTransfers.add(transferId);
     }
 
     @Override
     public void receive(Message msg){
         try{
-            String receivedMessage = msg.getObject().toString();
+            String receivedMessage = (String) msg.getObject();
             Connection conn = account.connect();
             // System.out.println("Received Message: " + receivedMessage);
 
@@ -106,26 +92,32 @@ public class BankSys implements Receiver{
                 System.out.println("Registro bem-sucedido!");
                 account.pushDB(account);
             }
-
+            
             if(receivedMessage.equals("TRANSFER_SUCCESS")){
                 System.out.println("Transferência concluída com sucesso. Saldos atualizados.");
+            }
+
+            if (receivedMessage.startsWith("DB_UPDATE:TRANSFER:")) {
+                markTransferAsProcessed(receivedMessage.substring("DB_UPDATE:TRANSFER:".length()));
             }
         }catch(Exception e) {
             throw new RuntimeException(e);
         }
     }
 
+    // Fazer o login do usuario
     private void handleLogin(String key, String password) throws Exception {
         int account_ID = Integer.parseInt(key);
         String account_password = password;
         boolean result;
+
+        Connection conn = account.connect();
         String sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
     
-        try (Connection conn = account.connect();
-         PreparedStatement ps = conn.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, account_password);
             ps.setInt(2, account_ID);
+            ResultSet rs = ps.executeQuery();
 
             if (!rs.next()) {
                 sendMessage("INVALID_PASSWORD");
@@ -149,14 +141,14 @@ public class BankSys implements Receiver{
     
             sql = "SELECT Name, CPF, Balance FROM Account WHERE Key = ?";
     
-            try (PreparedStatement ps2 = conn.prepareStatement(sql);
-                ResultSet rs2 = ps2.executeQuery())  {
+            try (PreparedStatement ps2 = conn.prepareStatement(sql)) {
                 ps2.setInt(1, account_ID);
+                rs = ps2.executeQuery();
     
-                if (rs2.next()) {
-                    account_name = rs2.getString("Name");
-                    account_cpf = rs2.getString("CPF");
-                    account_balance = rs2.getDouble("Balance");
+                if (rs.next()) {
+                    account_name = rs.getString("Name");
+                    account_cpf = rs.getString("CPF");
+                    account_balance = rs.getDouble("Balance");
     
                     account.setName(account_name);
                     account.setPassword(account_password);
@@ -170,6 +162,7 @@ public class BankSys implements Receiver{
         }
     }
     
+    // Registrar uma nova conta no DB
     private void handleRegister(String name, String password, String cpf, String balance) throws Exception{
         String account_name = name;
         String account_password = password;
@@ -205,8 +198,10 @@ public class BankSys implements Receiver{
         sendMessage("REGISTER_SUCCESS");
     }
 
+    // Transferir quantia X de conta logada para conta selecionada
     private void handleTransfer(String key, String value) throws SQLException{
         int own_account = account.getID();
+        String transferId = own_account + ":" + key + ":" + value;
 
         Double transfer_balance = 0.0;
         Double transfer_value = Double.parseDouble(value);
@@ -222,60 +217,64 @@ public class BankSys implements Receiver{
         String sql_update1 = "UPDATE Account SET Balance = ? WHERE Key = ?";
         String sql_update2 = "UPDATE Account SET Balance = ? WHERE Key = ?";
 
-        try(Connection conn1 = account.connect();
-            PreparedStatement ps1 = conn1.prepareStatement(sql1);
+        if(!transferAlreadyProcessed(transferId)){
+            try(Connection conn1 = account.connect();
+                PreparedStatement ps1 = conn1.prepareStatement(sql1);
 
-            Connection conn2 = account.connect();
-            PreparedStatement ps2 = conn2.prepareStatement(sql2);
+                Connection conn2 = account.connect();
+                PreparedStatement ps2 = conn2.prepareStatement(sql2);
 
-            Connection conn_update1 = account.connect();
-            PreparedStatement ps_update1 = conn_update1.prepareStatement(sql_update1);
+                Connection conn_update1 = account.connect();
+                PreparedStatement ps_update1 = conn_update1.prepareStatement(sql_update1);
 
-            Connection conn_update2 = account.connect();
-            PreparedStatement ps_update2 = conn_update2.prepareStatement(sql_update2)) {
+                Connection conn_update2 = account.connect();
+                PreparedStatement ps_update2 = conn_update2.prepareStatement(sql_update2)) {
 
-            ps1.setInt(1, own_account);
-            ResultSet rs1 = ps1.executeQuery();
+                ps1.setInt(1, own_account);
+                ResultSet rs1 = ps1.executeQuery();
 
-            if(rs1.next()){
-                own_balance = rs1.getDouble("Balance");
-                own_balance -= transfer_value;
-            }else{
-                System.out.println("Erro ao recuperar saldo da própria conta.");
-                return;
+                if(rs1.next()){
+                    own_balance = rs1.getDouble("Balance");
+                    own_balance -= transfer_value;
+                }else{
+                    System.out.println("Erro ao recuperar saldo da própria conta.");
+                    return;
+                }
+
+                ps2.setInt(1, transfer_account);
+
+                ResultSet rs2 = ps2.executeQuery();
+
+                if(rs2.next()){
+                    transfer_balance = rs2.getDouble("Balance");
+                    transfer_balance += transfer_value;
+                }else{
+                    System.out.println("Erro ao recuperar saldo da conta de destino.");
+                    return;
+                }
+
+                ps_update1.setDouble(1, own_balance);
+                ps_update1.setInt(2, own_account);
+
+                rowsAffected1 = ps_update1.executeUpdate();
+
+                ps_update2.setDouble(1, transfer_balance);
+                ps_update2.setInt(2, transfer_account);
+
+                rowsAffected2 = ps_update2.executeUpdate();
             }
 
-            ps2.setInt(1, transfer_account);
+            if(rowsAffected1 > 0 && rowsAffected2 > 0){
+                sendMessage("TRANSFER_SUCCESS");
 
-            ResultSet rs2 = ps2.executeQuery();
-
-            if(rs2.next()){
-                transfer_balance = rs2.getDouble("Balance");
-                transfer_balance += transfer_value;
+                sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
             }else{
-                System.out.println("Erro ao recuperar saldo da conta de destino.");
-                return;
+                System.out.println("Erro ao realizar a transferência.");
             }
-
-            ps_update1.setDouble(1, own_balance);
-            ps_update1.setInt(2, own_account);
-
-            rowsAffected1 = ps_update1.executeUpdate();
-
-            ps_update2.setDouble(1, transfer_balance);
-            ps_update2.setInt(2, transfer_account);
-
-            rowsAffected2 = ps_update2.executeUpdate();
-        }
-
-        if(rowsAffected1 > 0 && rowsAffected2 > 0){
-            sendMessage("TRANSFER_SUCCESS");
-        }else{
-            System.out.println("Erro ao realizar a transferência.");
         }
     }
 
-    private void handleloginRequest() throws Exception, SQLException{
+    private void handleLoginRequest() throws Exception, SQLException{
         boolean result;
         
         while(!login){
@@ -295,7 +294,7 @@ public class BankSys implements Receiver{
         }
     }
 
-    private void handleregisterRequest() throws Exception{
+    private void handleRegisterRequest() throws Exception{
         System.out.println("Nome do titular da conta: ");
         name = keyboard.nextLine();
         
@@ -314,7 +313,7 @@ public class BankSys implements Receiver{
         sendMessage(registerRequest);
     }
 
-    private void handletransferRequest() throws Exception{
+    private void handleTransferRequest() throws Exception{
         int transfer_account = 0;
         Double transfer_value = 0.0;
         
@@ -335,19 +334,14 @@ public class BankSys implements Receiver{
         String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_account;
         sendMessage(registerRequest);
     }
-
-    private void startThread() {
-        new Thread(this::processMessage).start();
-    }
-
-
+    
     public static void main(String[] args) throws Exception {
         BankSys bankSystem = new BankSys();
 
         String sql = "";
+        Connection conn = account.connect();
         
-        try (Scanner keyboard = new Scanner(System.in);
-            Connection conn = account.connect()) {
+        try (Scanner keyboard = new Scanner(System.in)) {
             while(bankSystem.login == false){
                 System.out.println("    -   SD Bank   -   ");
                 System.out.println(" ");
@@ -364,10 +358,10 @@ public class BankSys implements Receiver{
 
                 switch(option){
                     case 1:
-                        bankSystem.handleloginRequest();
+                        bankSystem.handleLoginRequest();
                         break;
                     case 2:
-                        bankSystem.handleregisterRequest();
+                        bankSystem.handleRegisterRequest();
                         break;
                     case 3:
                         System.exit(1);
@@ -416,7 +410,7 @@ public class BankSys implements Receiver{
                             
                             break;
                         case 2:
-                            bankSystem.handletransferRequest();
+                            bankSystem.handleTransferRequest();
                             break;
                         case 3:
                             System.exit(1);

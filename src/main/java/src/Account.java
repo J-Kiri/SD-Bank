@@ -76,37 +76,43 @@ public class Account{
         return conn;
     }
 
-    public void pushDB(Account account){
-        String Name = account.Name;
-        String Password = account.Password;
-        String CPF = account.CPF;
-        double Balance = account.Balance;
-        int Key = account.Key;
-
+    public void pushDB(Account account) {
         String sql = "INSERT INTO Account(Name, Password, CPF, Balance, Key) VALUES(?, ?, ?, ?, ?)";
 
-        try(Connection conn = this.connect();
-            PreparedStatement pstmt = conn.prepareStatement(sql)){
-                pstmt.setString(1, Name);
-                pstmt.setString(2, Password);
-                pstmt.setString(3, CPF);
-                pstmt.setDouble(4, Balance);
-                pstmt.setInt(5, Key);
+        try (Connection conn = this.connect();
+            PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-                pstmt.executeUpdate();
+            conn.setAutoCommit(false);
 
-                conn.commit();
-        }catch(SQLException e){
-            System.out.println(e.getMessage());
-        } 
+            pstmt.setString(1, account.getName());
+            pstmt.setString(2, account.getPassword());
+            pstmt.setString(3, account.getCPF());
+            pstmt.setDouble(4, account.getBalance());
+            pstmt.setInt(5, account.getID());
+
+            pstmt.executeUpdate();
+            conn.commit();
+
+        } catch (SQLException e) {
+            System.out.println("Error pushing data to the database: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
-    public static void close(Statement statement) {
-        try {
-            if (statement != null) {
+    public static void close(Statement statement, Connection conn, PreparedStatement pstmt) {
+        try{
+            if(statement != null){
                 statement.close();
             }
-        } catch (SQLException e) {
+
+            if(conn != null){
+                conn.close();
+            }
+
+            if(pstmt != null){
+                pstmt.close();
+            }
+        }catch(SQLException e){
             e.printStackTrace();
         }
     }
