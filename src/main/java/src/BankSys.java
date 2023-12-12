@@ -6,14 +6,17 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import java.util.Scanner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Random;
 
 //import org.jgroups.blocks.cs.ReceiverAdapter;
-import org.jgroups.*;
-import java.util.*;
+import org.jgroups.JChannel;
+import org.jgroups.Message;
+import org.jgroups.Receiver;
+import org.jgroups.View;
 
-public class BankSys extends ReceiverAdapter{
-    static int key = 0;
+public class BankSys implements Receiver{
+    static int key = 0; 
     static int option = 0;
 
     static String name;
@@ -49,10 +52,27 @@ public class BankSys extends ReceiverAdapter{
         }
     }
 
+    private void processMessage(){
+        while(true){
+            try{
+                Message msg = channel.receive();
+
+                if(msg != null){
+                    String receivedMessage = (String) msg.getObject();
+                    receive(receivedMessage);
+                }
+
+                Thread.sleep(1000);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+    }
+
     @Override
     public void receive(Message msg){
         try{
-            String receivedMessage = (String) msg.getObject();
+            String receivedMessage = msg.getObject().toString();
             Connection conn = account.connect();
             // System.out.println("Received Message: " + receivedMessage);
 
@@ -99,14 +119,13 @@ public class BankSys extends ReceiverAdapter{
         int account_ID = Integer.parseInt(key);
         String account_password = password;
         boolean result;
-
-        Connection conn = account.connect();
         String sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
     
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = account.connect();
+         PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
             ps.setString(1, account_password);
             ps.setInt(2, account_ID);
-            ResultSet rs = ps.executeQuery();
 
             if (!rs.next()) {
                 sendMessage("INVALID_PASSWORD");
@@ -130,14 +149,14 @@ public class BankSys extends ReceiverAdapter{
     
             sql = "SELECT Name, CPF, Balance FROM Account WHERE Key = ?";
     
-            try (PreparedStatement ps2 = conn.prepareStatement(sql)) {
+            try (PreparedStatement ps2 = conn.prepareStatement(sql);
+                ResultSet rs2 = ps2.executeQuery())  {
                 ps2.setInt(1, account_ID);
-                rs = ps2.executeQuery();
     
-                if (rs.next()) {
-                    account_name = rs.getString("Name");
-                    account_cpf = rs.getString("CPF");
-                    account_balance = rs.getDouble("Balance");
+                if (rs2.next()) {
+                    account_name = rs2.getString("Name");
+                    account_cpf = rs2.getString("CPF");
+                    account_balance = rs2.getDouble("Balance");
     
                     account.setName(account_name);
                     account.setPassword(account_password);
@@ -316,14 +335,19 @@ public class BankSys extends ReceiverAdapter{
         String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_account;
         sendMessage(registerRequest);
     }
-    
+
+    private void startThread() {
+        new Thread(this::processMessage).start();
+    }
+
+
     public static void main(String[] args) throws Exception {
         BankSys bankSystem = new BankSys();
 
         String sql = "";
-        Connection conn = account.connect();
         
-        try (Scanner keyboard = new Scanner(System.in)) {
+        try (Scanner keyboard = new Scanner(System.in);
+            Connection conn = account.connect()) {
             while(bankSystem.login == false){
                 System.out.println("    -   SD Bank   -   ");
                 System.out.println(" ");
