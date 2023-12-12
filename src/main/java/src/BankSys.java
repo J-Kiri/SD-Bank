@@ -72,6 +72,7 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             String[] parts = receivedMessage.split(":");
             String command = parts[0];
 
+            System.out.println(receivedMessage);
             switch(command){
                 case "LOGIN":
                     handleLogin(parts[1], parts[2]);
@@ -127,19 +128,22 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             ResultSet rs = ps.executeQuery();
 
             if (!rs.next()) {
-                sendMessage("INVALID_PASSWORD");
+                // sendMessage("INVALID_PASSWORD");
+                channel.send(null, "INVALID_PASSWORD");
                 return;
             }
     
             result = rs.getBoolean("Password");
             if (!result) {
-                sendMessage("INVALID_PASSWORD");
+                // sendMessage("INVALID_PASSWORD");
+                channel.send(null, "INVALID_PASSWORD");
                 return;
             }
     
             result = rs.getBoolean("Key");
             if (!result) {
-                sendMessage("ACCOUNT_NOT_FOUND");
+                // sendMessage("ACCOUNT_NOT_FOUND");
+                channel.send(null, "ACCOUNT_NOT_FOUND");
                 return;
             }
     
@@ -163,7 +167,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                     account.setBalance(account_balance);
                     account.setID(account_ID);
     
-                    sendMessage("LOGIN_SUCCESS");
+                    channel.send(null, "LOGIN_SUCCESS");
+                    // sendMessage("LOGIN_SUCCESS");
 
                     Account.close(null, conn, ps2);
                 }
@@ -214,7 +219,7 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
     }
 
     // Transferir quantia X de conta logada para conta selecionada
-    private void handleTransfer(String key, String value) throws SQLException{
+    private void handleTransfer(String key, String value) throws Exception{
         int own_account = account.getID();
         String transferId = own_account + ":" + key + ":" + value;
 
@@ -277,7 +282,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             
             sendMessage("TRANSFER_SUCCESS");
 
-            sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
+            channel.send(null, "DB_UPDATE:TRANSFER:" + key + ":" + value);
+            // sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
 
             //if(rowsAffected1 > 0 && rowsAffected2 > 0){
                 
@@ -307,7 +313,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             System.out.println(" ");
 
             String loginRequest = "LOGIN:" + key + ":" + password;
-            sendMessage(loginRequest);
+            channel.send(null, loginRequest);
+            // sendMessage(loginRequest);
         }
     }
 
@@ -327,7 +334,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         balance = 1000.00; 
         
         String registerRequest = "REGISTER:" + name + ":" + password + ":" + cpf + ":" + balance;
-        sendMessage(registerRequest);
+        channel.send(null, registerRequest);
+        // sendMessage(registerRequest);
     }
 
     private void handleTransferRequest() throws Exception{
@@ -348,8 +356,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             e.printStackTrace();
         }
 
-        String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_value;
-        sendMessage(registerRequest);
+        String transferRequest = "TRANSFER:" + transfer_account + ":" + transfer_value;
+        channel.send(null, transferRequest);
+        // sendMessage(transferRequest);
     }
     
     public static void main(String[] args) throws Exception {
@@ -389,9 +398,6 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                         account_key = account.getID();
                         account_name = account.getName();
 
-                        System.out.println(" ");
-                        System.out.println(" ");
-                        System.out.println(" ");
                         System.out.println(" ");
 
                         System.out.println("       Olá " + account_name + " - SD Bank");
