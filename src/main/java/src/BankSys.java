@@ -24,7 +24,6 @@ public class BankSys extends ReceiverAdapter{
 
     private boolean login = false;
 
-    
     static int account_key = 0;
     static Double account_balance = 0.0;
     static String account_name = "";
@@ -32,12 +31,7 @@ public class BankSys extends ReceiverAdapter{
 
     // Random r = new Random();
     static Account account = new Account();
-
-    static String sql;
-    static PreparedStatement ps, ps2;
-
     private JChannel channel;
-    
     static Scanner keyboard = new Scanner(System.in);
 
     public BankSys() throws Exception{
@@ -59,6 +53,7 @@ public class BankSys extends ReceiverAdapter{
     public void receive(Message msg){
         try{
             String receivedMessage = (String) msg.getObject();
+            Connection conn = account.connect();
             // System.out.println("Received Message: " + receivedMessage);
 
             String[] parts = receivedMessage.split(":");
@@ -68,15 +63,32 @@ public class BankSys extends ReceiverAdapter{
                 case "LOGIN":
                     handleLogin(parts[1], parts[2]);
                     break;
+
+                case "REGISTER":
+                    handleRegister(parts[1], parts[2], parts[3], parts[4]);
+                    break;
+
+                case "TRANSFER":
+                    handleTransfer(parts[1],parts[2]);
+                    break;
             }
 
-            if (receivedMessage.equals("LOGIN_SUCCESS")) {
+            if(receivedMessage.equals("LOGIN_SUCCESS")){
                 System.out.println("Login bem-sucedido!");
                 login = true;
-            } else if (receivedMessage.equals("INVALID_PASSWORD")) {
+            }else if(receivedMessage.equals("INVALID_PASSWORD")){
                 System.out.println("Senha incorreta. Tente novamente.");
-            } else if (receivedMessage.equals("ACCOUNT_NOT_FOUND")) {
+            }else if(receivedMessage.equals("ACCOUNT_NOT_FOUND")){
                 System.out.println("Conta não encontrada. Tente novamente.");
+            }
+
+            if(receivedMessage.equals("REGISTER_SUCCESS")){
+                System.out.println("Registro bem-sucedido!");
+                account.pushDB(account);
+            }
+
+            if(receivedMessage.equals("TRANSFER_SUCCESS")){
+                System.out.println("Transferência concluída com sucesso. Saldos atualizados.");
             }
         }catch(Exception e) {
             throw new RuntimeException(e);
@@ -89,7 +101,7 @@ public class BankSys extends ReceiverAdapter{
         boolean result;
 
         Connection conn = account.connect();
-        sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
+        String sql = "SELECT Password, Key FROM Account WHERE Password = ? AND Key = ?";
     
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, account_password);
@@ -139,6 +151,110 @@ public class BankSys extends ReceiverAdapter{
         }
     }
     
+    private void handleRegister(String name, String password, String cpf, String balance) throws Exception{
+        String account_name = name;
+        String account_password = password;
+        String account_cpf = cpf;
+        double account_balance = Double.parseDouble(balance);  
+
+        boolean result = true;
+
+        Random r = new Random();
+        int low = 1000;
+        int high = 9999;
+
+        String sql = "SELECT Key FROM Account WHERE Key = ?";
+        Connection conn = account.connect();
+        PreparedStatement ps = conn.prepareStatement(sql);
+
+        while(result == true){
+            id = r.nextInt(high-low) + low;
+
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, id);
+            ResultSet rs = ps.executeQuery();
+            
+            result = rs.getBoolean(1);
+        }
+        
+        account.setName(account_name);
+        account.setPassword(account_password);
+        account.setCPF(account_cpf);
+        account.setBalance(account_balance); 
+        account.setID(id);
+
+        sendMessage("REGISTER_SUCCESS");
+    }
+
+    private void handleTransfer(String key, String value) throws SQLException{
+        int own_account = account.getID();
+
+        Double transfer_balance = 0.0;
+        Double transfer_value = Double.parseDouble(value);
+        int transfer_account = Integer.parseInt(key);
+
+        Double own_balance = 0.0;
+
+        int rowsAffected1 = 0;
+        int rowsAffected2 = 0;
+
+        String sql1 = "SELECT Balance FROM Account WHERE Key = ?";
+        String sql2 = "SELECT Balance FROM Account WHERE Key = ?";
+        String sql_update1 = "UPDATE Account SET Balance = ? WHERE Key = ?";
+        String sql_update2 = "UPDATE Account SET Balance = ? WHERE Key = ?";
+
+        try(Connection conn1 = account.connect();
+            PreparedStatement ps1 = conn1.prepareStatement(sql1);
+
+            Connection conn2 = account.connect();
+            PreparedStatement ps2 = conn2.prepareStatement(sql2);
+
+            Connection conn_update1 = account.connect();
+            PreparedStatement ps_update1 = conn_update1.prepareStatement(sql_update1);
+
+            Connection conn_update2 = account.connect();
+            PreparedStatement ps_update2 = conn_update2.prepareStatement(sql_update2)) {
+
+            ps1.setInt(1, own_account);
+            ResultSet rs1 = ps1.executeQuery();
+
+            if(rs1.next()){
+                own_balance = rs1.getDouble("Balance");
+                own_balance -= transfer_value;
+            }else{
+                System.out.println("Erro ao recuperar saldo da própria conta.");
+                return;
+            }
+
+            ps2.setInt(1, transfer_account);
+
+            ResultSet rs2 = ps2.executeQuery();
+
+            if(rs2.next()){
+                transfer_balance = rs2.getDouble("Balance");
+                transfer_balance += transfer_value;
+            }else{
+                System.out.println("Erro ao recuperar saldo da conta de destino.");
+                return;
+            }
+
+            ps_update1.setDouble(1, own_balance);
+            ps_update1.setInt(2, own_account);
+
+            rowsAffected1 = ps_update1.executeUpdate();
+
+            ps_update2.setDouble(1, transfer_balance);
+            ps_update2.setInt(2, transfer_account);
+
+            rowsAffected2 = ps_update2.executeUpdate();
+        }
+
+        if(rowsAffected1 > 0 && rowsAffected2 > 0){
+            sendMessage("TRANSFER_SUCCESS");
+        }else{
+            System.out.println("Erro ao realizar a transferência.");
+        }
+    }
 
     private void handleloginRequest() throws Exception, SQLException{
         boolean result;
@@ -160,13 +276,51 @@ public class BankSys extends ReceiverAdapter{
         }
     }
 
-    private void handleregister() throws Exception{
+    private void handleregisterRequest() throws Exception{
+        System.out.println("Nome do titular da conta: ");
+        name = keyboard.nextLine();
+        
 
+        System.out.println("Senha da conta: ");
+        password = keyboard.nextLine();
+        
+        System.out.println("CPF do titular da conta");
+        cpf = keyboard.nextLine();
+        System.out.println(" ");
+        
+        // Double balance = keyboard.nextDouble();
+        balance = 1000.00; 
+        
+        String registerRequest = "REGISTER:" + name + ":" + password + ":" + cpf + ":" + balance;
+        sendMessage(registerRequest);
     }
+
+    private void handletransferRequest() throws Exception{
+        int transfer_account = 0;
+        Double transfer_value = 0.0;
+        
+        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
+            System.out.println("Digite a conta para que voce quer transferir: ");
+            transfer_account = Integer.parseInt(keyboard.nextLine());
+        }catch(NumberFormatException e) {
+            e.printStackTrace();
+        }
+
+        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
+            System.out.println("Digite o valor da transferência: R$");
+            transfer_value = Double.parseDouble(keyboard.nextLine());
+        }catch(NumberFormatException e) {
+            e.printStackTrace();
+        }
+
+        String registerRequest = "TRANSFER:" + transfer_account + ":" + transfer_account;
+        sendMessage(registerRequest);
+    }
+    
     public static void main(String[] args) throws Exception {
-        boolean result;
         BankSys bankSystem = new BankSys();
 
+        String sql = "";
         Connection conn = account.connect();
         
         try (Scanner keyboard = new Scanner(System.in)) {
@@ -189,168 +343,60 @@ public class BankSys extends ReceiverAdapter{
                         bankSystem.handleloginRequest();
                         break;
                     case 2:
-                        Random r = new Random();
-                        int low = 1000;
-                        int high = 9999;
-
-                        System.out.println("Nome do titular da conta: ");
-                        name = keyboard.nextLine();
-                        account.setName(name);
-
-                        System.out.println("Senha da conta: ");
-                        password = keyboard.nextLine();
-                        account.setPassword(password);
-                        
-                        System.out.println("CPF do titular da conta");
-                        cpf = keyboard.nextLine();
-                        account.setCPF(cpf);
-                        System.out.println(" ");
-                        
-                        // Double balance = keyboard.nextDouble();
-                        balance = 1000.00;
-                        account.setBalance(balance);      
-                        
-                        do{ //Se ja tiver o ID no banco de dados, gerar outro
-                            id = r.nextInt(high-low) + low;
-                            sql = "SELECT Key FROM Account WHERE Key = ?";
-
-                            ps = conn.prepareStatement(sql);
-                            ps.setInt(1, id);
-                            ResultSet rs = ps.executeQuery();
-                            
-                            result = rs.getBoolean(1);
-                            
-                        }while(result == true);
-                        
-                        account.setID(id);
-
-                        if(conn != null){
-                            account.pushDB(account);
-                        }
-                    
-
+                        bankSystem.handleregisterRequest();
                         break;
                     case 3:
                         System.exit(1);
                 }
             }
-
             
             if(bankSystem.login == true){
-                account_key = account.getID();
-                account_name = account.getName();
+                while(true){
+                    account_key = account.getID();
+                    account_name = account.getName();
 
-                System.out.println(" ");
-                System.out.println(" ");
-                System.out.println(" ");
-                System.out.println(" ");
+                    System.out.println(" ");
+                    System.out.println(" ");
+                    System.out.println(" ");
+                    System.out.println(" ");
 
-                System.out.println("       Olá " + account_name + " - SD Bank");
-                System.out.println(" ");
-                System.out.println("[   1 - Para consultar montante     ]");
-                System.out.println("[   2 - Para realizar transferencia ]");
-                System.out.println("[   3 - Encerrar sessão             ]");
-                System.out.println(" ");
-                try {   //nextInt nao pode ler /n. Ler Line e transformar em int
-                    System.out.println("Opção: ");
-                    option = Integer.parseInt(keyboard.nextLine());
-                } catch (NumberFormatException e) {
-                    e.printStackTrace();
-                }
+                    System.out.println("       Olá " + account_name + " - SD Bank");
+                    System.out.println(" ");
+                    System.out.println("[   1 - Para consultar montante     ]");
+                    System.out.println("[   2 - Para realizar transferencia ]");
+                    System.out.println("[   3 - Encerrar sessão             ]");
+                    System.out.println(" ");
 
-                switch(option){
-                    case 1:
-                        Double montante;
+                    try {   //nextInt nao pode ler /n. Ler Line e transformar em int
+                        System.out.println("Opção: ");
+                        option = Integer.parseInt(keyboard.nextLine());
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                    }
 
-                        sql = "SELECT SUM(Balance) as TotalMontante FROM Account";
+                    switch(option){
+                        case 1:
+                            Double montante;
 
-                        ps = conn.prepareStatement(sql);
-                        try(ResultSet rs = ps.executeQuery()){
-                            if (rs.next()) {
-                                // Obtém o valor da coluna "TotalBalance"
-                                montante = rs.getDouble("TotalMontante");
-                                System.out.println("Total dos saldos: R$" + montante);
-                            }
-                        }    
-                        
-                        break;
-                    case 2:
-                        int transfer_account = 0;
-                        int own_account = account.getID();
+                            sql = "SELECT SUM(Balance) as TotalMontante FROM Account";
 
-                        Double transfer_value = 0.0, transfer_balance = 0.0;
-                        Double own_balance;
-
-                        String sql1;
-                        String sql2;
-
-                        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
-                            System.out.println("Digite a conta para que voce quer transferir: ");
-                            transfer_account = Integer.parseInt(keyboard.nextLine());
-                        }catch(NumberFormatException e) {
-                            e.printStackTrace();
-                        }
-
-                        try{   //nextInt nao pode ler /n. Ler Line e transformar em int
-                            System.out.println("Digite o valor da transferência: R$");
-                            transfer_value = Double.parseDouble(keyboard.nextLine());
-                        }catch(NumberFormatException e) {
-                            e.printStackTrace();
-                        }
-
-                        sql1 = "SELECT Balance FROM Account WHERE Key = ?";
-                        ps = conn.prepareStatement(sql1);
-                        ps.setInt(1, own_account);
-                        ResultSet rs1 = ps.executeQuery();
-
-                        if(rs1.next()){
-                            own_balance = rs1.getDouble("Balance");
-                            own_balance -= transfer_value;
-                        }else{
-                            System.out.println("Erro ao recuperar saldo da própria conta.");
+                            try(PreparedStatement ps = conn.prepareStatement(sql)){
+                                try(ResultSet rs = ps.executeQuery()){
+                                    if (rs.next()) {
+                                        // Obtém o valor da coluna "TotalBalance"
+                                        montante = rs.getDouble("TotalMontante");
+                                        System.out.println("Total dos saldos: R$" + montante);
+                                    }
+                                }  
+                            }  
+                            
                             break;
-                        }
-
-                        sql2 = "SELECT Balance FROM Account WHERE Key = ?";
-
-                        ps2 = conn.prepareStatement(sql2);
-                        ps2.setInt(1, transfer_account);
-
-                        ResultSet rs2 = ps2.executeQuery();
-
-                        if(rs2.next()){
-                            transfer_balance = rs2.getDouble("Balance");
-                            transfer_balance += transfer_value;
-                        }else{
-                            System.out.println("Erro ao recuperar saldo da conta de destino.");
+                        case 2:
+                            bankSystem.handletransferRequest();
                             break;
-                        }
-
-                        sql1 = "UPDATE Account SET Balance = ? WHERE Key = ?";
-
-                        ps = conn.prepareStatement(sql1);
-                        ps.setDouble(1, own_balance);
-                        ps.setInt(2, own_account);
-
-                        int rowsAffected1 = ps.executeUpdate();
-
-                        sql2 = "UPDATE Account SET Balance = ? WHERE Key = ?";
-
-                        ps2 = conn.prepareStatement(sql2);
-                        ps2.setDouble(1, transfer_balance);
-                        ps2.setInt(2, transfer_account);
-
-                        int rowsAffected2 = ps2.executeUpdate();
-
-                        if (rowsAffected1 > 0 && rowsAffected2 > 0) {
-                            System.out.println("Transferência concluída com sucesso. Saldos atualizados.");
-                        } else {
-                            System.out.println("Erro ao realizar a transferência.");
-                        }
-
-                        break;
-                    case 3:
-                        System.exit(1);
+                        case 3:
+                            System.exit(1);
+                    }
                 }
             }else{
                 System.out.println(" ");
