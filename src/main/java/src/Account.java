@@ -2,6 +2,7 @@ package src;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -99,18 +100,18 @@ public class Account{
         }
     }
 
-    public static void close(Statement statement, Connection conn, PreparedStatement pstmt) {
+    public static void close(ResultSet rs, Connection conn, Statement statement) {
         try{
-            if(statement != null){
-                statement.close();
+            if(rs != null){
+                rs.close();
             }
 
             if(conn != null){
                 conn.close();
             }
 
-            if(pstmt != null){
-                pstmt.close();
+            if(statement != null){
+                statement.close();
             }
         }catch(SQLException e){
             e.printStackTrace();
