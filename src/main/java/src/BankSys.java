@@ -26,6 +26,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
     static String account_name = "";
     static String account_cpf = "";
 
+    private Set<String> processedTransfers = new HashSet<>();
+
     static Account account = new Account();
     private static JChannel channel;
     static Scanner keyboard = new Scanner(System.in);
@@ -51,6 +53,14 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean transferAlreadyProcessed(String transferId) {
+        return processedTransfers.contains(transferId);
+    }
+    
+    private void markTransferAsProcessed(String transferId) {
+        processedTransfers.add(transferId);
     }
 
     @Override
@@ -95,7 +105,7 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
             }
 
             if (receivedMessage.startsWith("DB_UPDATE:TRANSFER:")) {
-                System.out.println("Transferencia feita");
+                markTransferAsProcessed(receivedMessage.substring("DB_UPDATE:TRANSFER:".length()));
             }
         }catch(Exception e) {
             throw new RuntimeException(e);
@@ -222,17 +232,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
         String sql_update1 = "UPDATE Account SET Balance = ? WHERE Key = ?";
         String sql_update2 = "UPDATE Account SET Balance = ? WHERE Key = ?";
 
-        try(Connection conn1 = account.connect();
-            PreparedStatement ps1 = conn1.prepareStatement(sql1);
-
-            Connection conn2 = account.connect();
-            PreparedStatement ps2 = conn2.prepareStatement(sql2);
-
-            Connection conn_update1 = account.connect();
-            PreparedStatement ps_update1 = conn_update1.prepareStatement(sql_update1);
-
-            Connection conn_update2 = account.connect();
-            PreparedStatement ps_update2 = conn_update2.prepareStatement(sql_update2)) {
+        if(!transferAlreadyProcessed(transferId)){
+            Connection conn = account.connect();
+            PreparedStatement ps1 = conn.prepareStatement(sql1);
 
             ps1.setInt(1, own_account);
             ResultSet rs1 = ps1.executeQuery();
@@ -244,6 +246,8 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                 System.out.println("Erro ao recuperar saldo da própria conta.");
                 return;
             }
+
+            PreparedStatement ps2 = conn.prepareStatement(sql2);
 
             ps2.setInt(1, transfer_account);
 
@@ -257,18 +261,21 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                 return;
             }
 
-            ps_update1.setDouble(1, own_balance);
-            ps_update1.setInt(2, own_account);
+            ps1 = conn.prepareStatement(sql_update1);
 
-            rowsAffected1 = ps_update1.executeUpdate();
+            ps1.setDouble(1, own_balance);
+            ps1.setInt(2, own_account);
 
-            ps_update2.setDouble(1, transfer_balance);
-            ps_update2.setInt(2, transfer_account);
+            rowsAffected1 = ps1.executeUpdate();
 
-            rowsAffected2 = ps_update2.executeUpdate();
+            ps2 = conn.prepareStatement(sql_update2);
+
+            ps2.setDouble(1, transfer_balance);
+            ps2.setInt(2, transfer_account);
+
+            rowsAffected2 = ps2.executeUpdate();
 
             if(rowsAffected1 > 0 && rowsAffected2 > 0){
-                
                 sendMessage("TRANSFER_SUCCESS");
 
                 sendMessage("DB_UPDATE:TRANSFER:" + key + ":" + value);
@@ -276,11 +283,9 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                 System.out.println("Erro ao realizar a transferência.");
             }
 
-            Account.close(rs1, conn1, ps1);
-            Account.close(rs2, conn2, ps2);
-            Account.close(null, conn_update1, ps_update1);
-            Account.close(null, conn_update2, ps_update2);
-        }     
+            Account.close(rs1, conn, ps1);
+            Account.close(rs2, null, ps2);
+        }
     }
 
     private void handleLoginRequest() throws Exception, SQLException{
@@ -413,8 +418,6 @@ public class BankSys extends ReceiverAdapter implements AutoCloseable{
                                             montante = rs.getDouble("TotalMontante");
                                             System.out.println("Total dos saldos: R$" + montante);
                                         }
-
-                                        Account.close(rs, conn, ps);
                                     }  
                                 }  
                                 
